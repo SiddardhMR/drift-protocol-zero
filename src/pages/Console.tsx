@@ -1,14 +1,28 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import GlitchText from '../components/GlitchText';
 import TypewriterText from '../components/TypewriterText';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 const Console = () => {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<Array<{ command: string; output: string; type: 'command' | 'output' | 'error' }>>([]);
   const [currentPath, setCurrentPath] = useState('~/drift/protocol');
+  const [currentPage, setCurrentPage] = useState(1);
   const terminalRef = useRef<HTMLDivElement>(null);
+  
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(history.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentHistory = history.slice(startIndex, endIndex);
 
   const commands = {
     help: 'Available commands: drift.state(), freeze.override(), connect.wallet(), clear, ls, pwd, whoami',
@@ -39,7 +53,14 @@ const Console = () => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [history]);
+  }, [currentHistory]);
+
+  useEffect(() => {
+    // Auto-navigate to last page when new items are added
+    if (totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [history.length]);
 
   const handleCommand = (cmd: string) => {
     if (!cmd.trim()) return;
@@ -51,6 +72,7 @@ const Console = () => {
     setTimeout(() => {
       if (command === 'clear') {
         setHistory([]);
+        setCurrentPage(1);
         return;
       }
 
@@ -65,6 +87,10 @@ const Console = () => {
     e.preventDefault();
     handleCommand(input);
     setInput('');
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -100,7 +126,7 @@ const Console = () => {
               <div className="w-3 h-3 bg-matrix-green rounded-full"></div>
             </div>
             <div className="font-jetbrains text-xs text-gray-400">
-              drift_terminal@nullpath:~
+              drift_terminal@nullpath:~ | Page {currentPage} of {totalPages || 1}
             </div>
           </div>
 
@@ -109,8 +135,8 @@ const Console = () => {
             ref={terminalRef}
             className="h-96 overflow-y-auto p-4 font-jetbrains text-sm bg-black"
           >
-            {history.map((entry, index) => (
-              <div key={index} className="mb-2">
+            {currentHistory.map((entry, index) => (
+              <div key={startIndex + index} className="mb-2">
                 {entry.type === 'command' && (
                   <div className="flex">
                     <span className="text-matrix-green mr-2">drift@nullpath:~$</span>
@@ -132,20 +158,78 @@ const Console = () => {
               </div>
             ))}
             
-            {/* Current Input Line */}
-            <form onSubmit={handleSubmit} className="flex">
-              <span className="text-matrix-green mr-2">drift@nullpath:~$</span>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="bg-transparent text-white outline-none flex-1 font-jetbrains"
-                autoFocus
-                placeholder="Enter command..."
-              />
-              <span className="text-matrix-green animate-pulse">|</span>
-            </form>
+            {/* Current Input Line - only show on last page */}
+            {currentPage === totalPages && (
+              <form onSubmit={handleSubmit} className="flex">
+                <span className="text-matrix-green mr-2">drift@nullpath:~$</span>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  className="bg-transparent text-white outline-none flex-1 font-jetbrains"
+                  autoFocus
+                  placeholder="Enter command..."
+                />
+                <span className="text-matrix-green animate-pulse">|</span>
+              </form>
+            )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="border-t border-matrix-green/30 p-4 bg-black">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) handlePageChange(currentPage - 1);
+                      }}
+                      className={`text-matrix-green border-matrix-green/30 hover:bg-matrix-green/10 ${
+                        currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <PaginationLink
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handlePageChange(pageNum);
+                          }}
+                          isActive={currentPage === pageNum}
+                          className={`text-matrix-green border-matrix-green/30 hover:bg-matrix-green/10 ${
+                            currentPage === pageNum ? 'bg-matrix-green/20' : ''
+                          }`}
+                        >
+                          {pageNum}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) handlePageChange(currentPage + 1);
+                      }}
+                      className={`text-matrix-green border-matrix-green/30 hover:bg-matrix-green/10 ${
+                        currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </motion.div>
 
         {/* Quick Commands */}
